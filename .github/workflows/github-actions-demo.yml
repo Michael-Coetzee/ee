@@ -1,0 +1,54 @@
+name: Deploy Gist Getter API
+run-name: ${{ github.actor }} is deploying Gist Getter API 🚀
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  deploy-to-minikube:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Build Docker image with commit SHA
+        run: |
+          IMAGE_TAG="ee:${{ github.sha }}"
+          docker build -t $IMAGE_TAG .
+          docker tag $IMAGE_TAG ee:latest
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+
+      - name: Load image into minikube
+        run: minikube image load ee:latest
+
+      - name: Clean up old deployments
+        run: |
+          kubectl delete deployment gist-getter --ignore-not-found=true
+          kubectl delete service gist-getter-service --ignore-not-found=true
+          sleep 10
+
+      - name: Deploy to Kubernetes
+        run: kubectl apply -f deployment.yml
+
+      - name: Wait for deployment to be ready
+        run: |
+          kubectl rollout status deployment/gist-getter --timeout=300s
+          kubectl get pods -l app=gist-getter
+
+      - name: Verify deployment health
+        run: |
+          sleep 30
+          kubectl get pods -l app=gist-getter
+          echo "✅ Deployment completed successfully!"
+          echo "🌐 Access your API at: $(minikube service gist-getter-service --url)"
+
+      - name: Clean up old Docker images (keep last 3)
+        run: |
+          docker images ee --format "table {{.Repository}}:{{.Tag}}\t{{.CreatedAt}}" | \
+          grep -v "CREATED AT" | \
+          sort -k2 -r | \
+          tail -n +4 | \
+          awk '{print $1}' | \
+          xargs -r docker rmi || true

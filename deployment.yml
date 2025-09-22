@@ -5,7 +5,7 @@ metadata:
   labels:
     app: gist-getter
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: gist-getter
@@ -17,27 +17,9 @@ spec:
       containers:
         - name: ee-container
           image: ee:latest
-          imagePullPolicy: Never
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
-          command: ["/bin/bash", "-c"]
-          args: ["uvicorn app.main:app --host 0.0.0.0 --port 8080"]
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: 8080
-            initialDelaySeconds: 30
-            periodSeconds: 30
-            timeoutSeconds: 10
-            failureThreshold: 3
-          readinessProbe:
-            httpGet:
-              path: /health
-              port: 8080
-            initialDelaySeconds: 15
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 3
           resources:
             requests:
               cpu: 100m
